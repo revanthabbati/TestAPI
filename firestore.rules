@@ -1,13 +1,28 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Anyone can ADD a new test request (needed since the Worker writes
-    // without logging in). Nobody can read, change, or delete from outside —
-    // you view everything safely through the Firebase Console instead,
-    // where you're logged in as the project owner.
+
+    // Captured test requests. The Worker writes here without logging in
+    // (that's normal — it's just relaying whatever hit its public URL).
+    // Only signed-in admins (see below) can read them.
     match /requests/{docId} {
       allow create: if true;
-      allow read, update, delete: if false;
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // Allow-list of dashboard users. Each document ID is an email address,
+    // e.g. admins/revanth.abbati@dispatchtrack.com
+    // Add more people later by creating more documents here — no redeploy
+    // needed. Nobody can read or write this collection from outside; it's
+    // only ever checked internally by isAdmin() below.
+    match /admins/{email} {
+      allow read, write: if false;
+    }
+
+    function isAdmin() {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
     }
   }
 }

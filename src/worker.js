@@ -1,10 +1,20 @@
 // This is the "mailbox". It runs on Cloudflare's free network and gets a
 // permanent public URL. Every request sent to it gets written down as a
-// document in a Firestore collection called "requests", which you can browse
-// in the Firebase Console.
+// document in a Firestore collection called "requests", viewable in the
+// dashboard (or the Firebase Console).
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': '*',
+};
 
 export default {
   async fetch(request, env) {
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { headers: CORS_HEADERS });
+    }
+
     const url = new URL(request.url);
     const body = await request.text();
 
@@ -38,12 +48,12 @@ export default {
       const detail = await firestoreResp.text();
       return new Response(JSON.stringify({ status: 'error', detail }), {
         status: 502,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
       });
     }
 
     return new Response(JSON.stringify({ status: 'ok', received_bytes: body.length }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
     });
   },
 };
