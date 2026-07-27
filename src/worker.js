@@ -1,7 +1,4 @@
-// This is the "mailbox". It runs on Cloudflare's free network and gets a
-// permanent public URL. Every request sent to it gets written down as a
-// document in a Firestore collection called "requests", viewable in the
-// dashboard (or the Firebase Console).
+
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',

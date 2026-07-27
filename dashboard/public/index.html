@@ -101,6 +101,38 @@
     padding: 14px; font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap;
     word-break: break-word; margin: 0;
   }
+
+  /* ---- Manage Access modal ---- */
+  #accessModal {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5);
+    align-items: center; justify-content: center; z-index: 50;
+  }
+  #accessModal .box {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    width: 420px; max-width: 90vw; max-height: 80vh; display: flex; flex-direction: column;
+  }
+  #accessModal .head {
+    padding: 16px 18px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  #accessModal .head h2 { font-size: 15px; margin: 0; }
+  #accessModal .close { cursor: pointer; color: var(--text-dim); font-size: 18px; background: none; border: none; }
+  #accessModal .body { padding: 16px 18px; overflow-y: auto; }
+  #adminList { list-style: none; margin: 0 0 14px; padding: 0; }
+  #adminList li {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+  }
+  #adminList li .you { color: var(--text-dim); font-size: 11px; margin-left: 6px; }
+  #adminList button.remove {
+    background: none; border: none; color: var(--err); cursor: pointer; font-size: 13px;
+  }
+  #adminList button.remove:disabled { color: var(--text-dim); cursor: not-allowed; }
+  #addAdminRow { display: flex; gap: 8px; }
+  #addAdminRow input { flex: 1; }
+  #accessMsg { margin-top: 10px; font-size: 12px; }
+  #accessMsg.err { color: var(--err); }
+  #accessMsg.ok { color: var(--ok); }
 </style>
 </head>
 <body>
@@ -117,6 +149,7 @@
       <div class="brand"><span class="dot"></span> API Test Console</div>
       <div class="user">
         <span id="userEmail"></span>
+        <button class="btn secondary small" id="manageAccessBtn">Manage Access</button>
         <button class="btn secondary small" id="signOutBtn">Sign out</button>
       </div>
     </div>
@@ -133,19 +166,31 @@
             <input id="apiKey" value="test123" />
           </div>
           <div class="field">
-            <label>code</label>
+            <label>Activation code</label>
             <input id="code" value="revanthdt" />
           </div>
         </div>
-        <div class="field">
-          <label>Content-Type</label>
-          <select id="contentType">
-            <option value="application/xml" selected>application/xml</option>
-            <option value="application/json">application/json</option>
-            <option value="text/plain">text/plain</option>
-          </select>
+        <div class="row">
+          <div class="field">
+            <label>Method</label>
+            <select id="method">
+              <option value="GET">GET</option>
+              <option value="POST" selected>POST</option>
+              <option value="PUT">PUT</option>
+              <option value="PATCH">PATCH</option>
+              <option value="DELETE">DELETE</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Content-Type</label>
+            <select id="contentType">
+              <option value="application/xml" selected>application/xml</option>
+              <option value="application/json">application/json</option>
+              <option value="text/plain">text/plain</option>
+            </select>
+          </div>
         </div>
-        <div class="field">
+        <div class="field" id="bodyField">
           <label>Body</label>
           <textarea id="body"></textarea>
         </div>
@@ -165,13 +210,31 @@
     </div>
   </div>
 
+  <div id="accessModal">
+    <div class="box">
+      <div class="head">
+        <h2>Manage Access</h2>
+        <button class="close" id="accessCloseBtn">&times;</button>
+      </div>
+      <div class="body">
+        <ul id="adminList"></ul>
+        <div id="addAdminRow">
+          <input id="newAdminEmail" placeholder="name@company.com" />
+          <button class="btn small" id="addAdminBtn">Add</button>
+        </div>
+        <div id="accessMsg"></div>
+      </div>
+    </div>
+  </div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getFirestore, collection, query, orderBy, limit, onSnapshot
+  getFirestore, collection, query, orderBy, limit, onSnapshot,
+  doc, setDoc, deleteDoc, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -202,6 +265,7 @@ document.getElementById('signOutBtn').onclick = () => signOut(auth);
 
 let unsubscribe = null;
 const items = new Map();
+let currentEmail = null;
 
 onAuthStateChanged(auth, (user) => {
   if (unsubscribe) { unsubscribe(); unsubscribe = null; }
@@ -209,11 +273,13 @@ onAuthStateChanged(auth, (user) => {
   renderList();
 
   if (!user) {
+    currentEmail = null;
     gate.style.display = 'flex';
     appEl.style.display = 'none';
     return;
   }
 
+  currentEmail = user.email;
   userEmailEl.textContent = user.email;
 
   const q = query(collection(db, 'requests'), orderBy('time', 'desc'), limit(100));
@@ -306,10 +372,21 @@ fetch('sample_order.xml').then(r => r.ok ? r.text() : '').then(t => {
   if (t && !document.getElementById('body').value) document.getElementById('body').value = t;
 }).catch(() => {});
 
+const methodEl = document.getElementById('method');
+const bodyFieldEl = document.getElementById('bodyField');
+const BODYLESS_METHODS = new Set(['GET', 'DELETE']);
+
+function syncBodyFieldVisibility() {
+  bodyFieldEl.style.display = BODYLESS_METHODS.has(methodEl.value) ? 'none' : 'block';
+}
+methodEl.onchange = syncBodyFieldVisibility;
+syncBodyFieldVisibility();
+
 document.getElementById('sendBtn').onclick = async () => {
   const endpoint = document.getElementById('endpoint').value.trim();
   const apiKey = document.getElementById('apiKey').value;
   const code = document.getElementById('code').value;
+  const method = methodEl.value;
   const contentType = document.getElementById('contentType').value;
   const body = document.getElementById('body').value;
   const resultEl = document.getElementById('sendResult');
@@ -321,10 +398,12 @@ document.getElementById('sendBtn').onclick = async () => {
     const url = new URL(endpoint);
     url.searchParams.set('api_key', apiKey);
     url.searchParams.set('code', code);
+
+    const hasBody = !BODYLESS_METHODS.has(method);
     const resp = await fetch(url.toString(), {
-      method: 'POST',
-      headers: { 'Content-Type': contentType },
-      body,
+      method,
+      headers: hasBody ? { 'Content-Type': contentType } : undefined,
+      body: hasBody ? body : undefined,
     });
     const text = await resp.text();
     resultEl.className = resp.ok ? 'ok' : 'err';
@@ -333,6 +412,77 @@ document.getElementById('sendBtn').onclick = async () => {
     resultEl.className = 'err';
     resultEl.textContent = 'Failed: ' + e.message;
   }
+};
+
+// ---- Manage Access ----
+const accessModal = document.getElementById('accessModal');
+const adminListEl = document.getElementById('adminList');
+const accessMsgEl = document.getElementById('accessMsg');
+
+async function loadAdmins() {
+  accessMsgEl.className = '';
+  accessMsgEl.textContent = 'Loading…';
+  try {
+    const snap = await getDocs(collection(db, 'admins'));
+    adminListEl.innerHTML = '';
+    snap.forEach(d => {
+      const email = d.id;
+      const li = document.createElement('li');
+      const isYou = email === currentEmail;
+      li.innerHTML = `
+        <span>${escapeHtml(email)}${isYou ? '<span class="you">(you)</span>' : ''}</span>
+        <button class="remove" ${isYou ? 'disabled title="You can\'t remove your own access"' : ''}>Remove</button>
+      `;
+      li.querySelector('button').onclick = () => removeAdmin(email);
+      adminListEl.appendChild(li);
+    });
+    accessMsgEl.textContent = '';
+  } catch (e) {
+    accessMsgEl.className = 'err';
+    accessMsgEl.textContent = 'Failed to load: ' + e.message;
+  }
+}
+
+async function removeAdmin(email) {
+  try {
+    await deleteDoc(doc(db, 'admins', email));
+    loadAdmins();
+  } catch (e) {
+    accessMsgEl.className = 'err';
+    accessMsgEl.textContent = 'Failed to remove: ' + e.message;
+  }
+}
+
+document.getElementById('addAdminBtn').onclick = async () => {
+  const input = document.getElementById('newAdminEmail');
+  const email = input.value.trim().toLowerCase();
+  if (!email || !email.includes('@')) {
+    accessMsgEl.className = 'err';
+    accessMsgEl.textContent = 'Enter a valid email address.';
+    return;
+  }
+  try {
+    await setDoc(doc(db, 'admins', email), {
+      role: 'admin',
+      addedBy: currentEmail,
+      addedAt: new Date().toISOString(),
+    });
+    input.value = '';
+    accessMsgEl.className = 'ok';
+    accessMsgEl.textContent = `Added ${email}.`;
+    loadAdmins();
+  } catch (e) {
+    accessMsgEl.className = 'err';
+    accessMsgEl.textContent = 'Failed to add: ' + e.message;
+  }
+};
+
+document.getElementById('manageAccessBtn').onclick = () => {
+  accessModal.style.display = 'flex';
+  loadAdmins();
+};
+document.getElementById('accessCloseBtn').onclick = () => {
+  accessModal.style.display = 'none';
 };
 </script>
 </body>

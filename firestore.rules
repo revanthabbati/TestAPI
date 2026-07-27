@@ -13,11 +13,10 @@ service cloud.firestore {
 
     // Allow-list of dashboard users. Each document ID is an email address,
     // e.g. admins/revanth.abbati@dispatchtrack.com
-    // Add more people later by creating more documents here — no redeploy
-    // needed. Nobody can read or write this collection from outside; it's
-    // only ever checked internally by isAdmin() below.
+    // Existing admins can add/remove other admins from the dashboard's
+    // "Manage Access" panel. Nobody else can read or write this collection.
     match /admins/{email} {
-      allow read, write: if false;
+      allow read, write: if isAdmin();
     }
 
     function isAdmin() {
