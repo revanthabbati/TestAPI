@@ -133,6 +133,33 @@
   #accessMsg { margin-top: 10px; font-size: 12px; }
   #accessMsg.err { color: var(--err); }
   #accessMsg.ok { color: var(--ok); }
+
+  /* ---- Footer ---- */
+  #footer {
+    flex-shrink: 0; text-align: center; font-size: 11px; color: var(--text-dim);
+    background: var(--panel); border-top: 1px solid var(--border); padding: 7px 0;
+  }
+
+  /* ---- Settings modal (shares .box/.head/.body styling with Manage Access) ---- */
+  #settingsModal {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5);
+    align-items: center; justify-content: center; z-index: 50;
+  }
+  #settingsModal .box {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    width: 420px; max-width: 90vw; max-height: 80vh; display: flex; flex-direction: column;
+  }
+  #settingsModal .head {
+    padding: 16px 18px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  #settingsModal .head h2 { font-size: 15px; margin: 0; }
+  #settingsModal .close { cursor: pointer; color: var(--text-dim); font-size: 18px; background: none; border: none; }
+  #settingsModal .body { padding: 16px 18px; overflow-y: auto; }
+  #settingsModal p.hint { color: var(--text-dim); font-size: 12px; margin: 0 0 14px; }
+  #settingsMsg { margin-top: 10px; font-size: 12px; }
+  #settingsMsg.err { color: var(--err); }
+  #settingsMsg.ok { color: var(--ok); }
 </style>
 </head>
 <body>
@@ -149,6 +176,7 @@
       <div class="brand"><span class="dot"></span> API Test Console</div>
       <div class="user">
         <span id="userEmail"></span>
+        <button class="btn secondary small" id="settingsBtn">Settings</button>
         <button class="btn secondary small" id="manageAccessBtn">Manage Access</button>
         <button class="btn secondary small" id="signOutBtn">Sign out</button>
       </div>
@@ -208,6 +236,30 @@
 
       <div id="detail"><div class="placeholder">Select a request on the left to see full details.</div></div>
     </div>
+
+    <div id="footer">Developed by Revanth Reddy Abbati</div>
+  </div>
+
+  <div id="settingsModal">
+    <div class="box">
+      <div class="head">
+        <h2>Settings — Expected Credentials</h2>
+        <button class="close" id="settingsCloseBtn">&times;</button>
+      </div>
+      <div class="body">
+        <p class="hint">The Worker checks every incoming request's <code>api_key</code> and <code>code</code> against these values and rejects mismatches with HTTP 401 — same as a real endpoint. Leave unset to accept anything.</p>
+        <div class="field">
+          <label>Expected api_key</label>
+          <input id="expApiKey" />
+        </div>
+        <div class="field">
+          <label>Expected code</label>
+          <input id="expCode" />
+        </div>
+        <button class="btn small" id="saveSettingsBtn">Save</button>
+        <div id="settingsMsg"></div>
+      </div>
+    </div>
   </div>
 
   <div id="accessModal">
@@ -234,7 +286,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getFirestore, collection, query, orderBy, limit, onSnapshot,
-  doc, setDoc, deleteDoc, getDocs
+  doc, setDoc, deleteDoc, getDocs, getDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -281,6 +333,7 @@ onAuthStateChanged(auth, (user) => {
 
   currentEmail = user.email;
   userEmailEl.textContent = user.email;
+  loadConfigIntoComposer();
 
   const q = query(collection(db, 'requests'), orderBy('time', 'desc'), limit(100));
   unsubscribe = onSnapshot(q,
@@ -483,6 +536,63 @@ document.getElementById('manageAccessBtn').onclick = () => {
 };
 document.getElementById('accessCloseBtn').onclick = () => {
   accessModal.style.display = 'none';
+};
+
+// ---- Settings (expected credentials) ----
+const settingsModal = document.getElementById('settingsModal');
+const settingsMsgEl = document.getElementById('settingsMsg');
+const expApiKeyEl = document.getElementById('expApiKey');
+const expCodeEl = document.getElementById('expCode');
+
+async function loadConfigIntoComposer() {
+  try {
+    const snap = await getDoc(doc(db, 'config', 'credentials'));
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.apiKey) document.getElementById('apiKey').value = data.apiKey;
+      if (data.code) document.getElementById('code').value = data.code;
+    }
+  } catch (e) { /* not signed in yet, or config not readable — ignore */ }
+}
+
+async function loadSettings() {
+  settingsMsgEl.className = '';
+  settingsMsgEl.textContent = 'Loading…';
+  try {
+    const snap = await getDoc(doc(db, 'config', 'credentials'));
+    const data = snap.exists() ? snap.data() : {};
+    expApiKeyEl.value = data.apiKey || '';
+    expCodeEl.value = data.code || '';
+    settingsMsgEl.textContent = '';
+  } catch (e) {
+    settingsMsgEl.className = 'err';
+    settingsMsgEl.textContent = 'Failed to load: ' + e.message;
+  }
+}
+
+document.getElementById('saveSettingsBtn').onclick = async () => {
+  try {
+    await setDoc(doc(db, 'config', 'credentials'), {
+      apiKey: expApiKeyEl.value,
+      code: expCodeEl.value,
+      updatedBy: currentEmail,
+      updatedAt: new Date().toISOString(),
+    });
+    settingsMsgEl.className = 'ok';
+    settingsMsgEl.textContent = 'Saved. New requests will now be checked against these values.';
+    loadConfigIntoComposer();
+  } catch (e) {
+    settingsMsgEl.className = 'err';
+    settingsMsgEl.textContent = 'Failed to save: ' + e.message;
+  }
+};
+
+document.getElementById('settingsBtn').onclick = () => {
+  settingsModal.style.display = 'flex';
+  loadSettings();
+};
+document.getElementById('settingsCloseBtn').onclick = () => {
+  settingsModal.style.display = 'none';
 };
 </script>
 </body>

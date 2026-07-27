@@ -19,6 +19,15 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // The expected api_key/code the Worker validates incoming requests
+    // against. Readable by anyone (the Worker itself reads this
+    // unauthenticated, same as it writes to "requests"), but only admins
+    // can change it.
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     function isAdmin() {
       return request.auth != null &&
         exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
