@@ -1,0 +1,62 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<service_orders>
+<service_order>
+<number>IssStore4</number>
+<account>01</account>
+<service_type>Delivery</service_type>
+<delivery_date>2023-12-07</delivery_date>
+<request_time_window_start>11:00:00 AM</request_time_window_start>
+<request_time_window_end>01:00:00 PM</request_time_window_end>
+<customer>
+<customer_id></customer_id>
+<first_name>ManiST4</first_name>
+<phone1></phone1>
+<address1>1-18</address1>
+<city>LB Nagar</city>
+<state>Telangana</state>
+<zip>500074</zip>
+</customer>
+<additional_fields>
+<store_code>4040</store_code>
+<contact></contact>
+<bill_name>TOP OF THE LINE SECURITY INC</bill_name>
+<bill_address_1>24 LINDA LN</bill_address_1>
+<bill_city>YONKERS</bill_city>
+<bill_state>NY</bill_state>
+<bill_zip>107101109</bill_zip>
+<route_label>CP</route_label>
+<bill_to_account>1955548</bill_to_account>
+<ready_flag>Y</ready_flag>
+<ready_date>2023-8-2</ready_date>
+<days_ready>5</days_ready>
+<follow_1_comment>SCHEDULED 08/07/2023 </follow_1_comment>
+<follow_1_date>08/04/2023</follow_1_date>
+<unit_type>GAS</unit_type>
+<freight_code>JET TRANSIT</freight_code>
+<terms>CDT CRD C</terms>
+<core_amount>480</core_amount>
+<skid_amount>50</skid_amount>
+<route_group>21</route_group>
+</additional_fields>
+<custom_fields>
+<core_chargeback>NO</core_chargeback>
+<new_return>NO</new_return>
+<spot_exchange>NO</spot_exchange>
+</custom_fields>
+<notes count="1">
+<note created_at="08/07/2023">please call one day ahead </note>
+</notes>
+<items>
+<item>
+<quantity>-1</quantity>
+<cube>1296</cube>
+<weight>415</weight>
+<setup_time>3</setup_time>
+<number>458469</number>
+<sale_sequence>0</sale_sequence>
+<serial_number>795010</serial_number>
+<description>5.7/350 V8 C</description>
+</item>
+</items>
+</service_order>
+</service_orders>

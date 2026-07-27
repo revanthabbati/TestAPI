@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>API Test Console</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161923;
+    --panel-2: #1d2130;
+    --border: #2a2f3f;
+    --text: #e6e8ef;
+    --text-dim: #8b90a3;
+    --accent: #5b8cff;
+    --accent-dim: #33456e;
+    --ok: #3ddc97;
+    --err: #ff5c7a;
+    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---- Sign-in gate ---- */
+  #gate {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px; text-align: center; padding: 24px;
+  }
+  #gate h1 { font-size: 22px; margin: 0; }
+  #gate p { color: var(--text-dim); margin: 0; max-width: 360px; }
+  .btn {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .btn:hover { filter: brightness(1.1); }
+  .btn.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  .btn.small { padding: 6px 12px; font-size: 12px; }
+
+  /* ---- Top bar ---- */
+  #topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--panel);
+  }
+  #topbar .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; }
+  #topbar .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+  #topbar .user { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-dim); }
+
+  /* ---- Layout ---- */
+  #app { display: none; flex: 1; flex-direction: column; height: 100vh; }
+  #main { flex: 1; display: flex; overflow: hidden; }
+
+  #composer {
+    width: 380px; border-right: 1px solid var(--border); background: var(--panel);
+    padding: 16px; overflow-y: auto; flex-shrink: 0;
+  }
+  #composer h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); margin: 0 0 12px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; }
+  .field input, .field textarea, .field select {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 8px 10px; font-size: 13px; font-family: var(--mono);
+  }
+  .field textarea { resize: vertical; min-height: 160px; }
+  .row { display: flex; gap: 8px; }
+  .row .field { flex: 1; }
+  #sendResult { margin-top: 10px; font-size: 12px; padding: 8px; border-radius: 6px; display: none; }
+  #sendResult.ok { display: block; background: rgba(61,220,151,.12); color: var(--ok); }
+  #sendResult.err { display: block; background: rgba(255,92,122,.12); color: var(--err); }
+
+  #listPane { width: 360px; border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+  #listHeader { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  #listHeader h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); margin: 0; }
+  #count { font-size: 12px; color: var(--text-dim); }
+  #list { flex: 1; overflow-y: auto; }
+  .item {
+    padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer;
+  }
+  .item:hover { background: var(--panel-2); }
+  .item.active { background: var(--accent-dim); }
+  .item .top { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; }
+  .item .method { font-family: var(--mono); font-weight: 700; color: var(--accent); }
+  .item .path { font-size: 13px; font-family: var(--mono); word-break: break-all; }
+  .empty { padding: 24px 16px; color: var(--text-dim); font-size: 13px; }
+
+  #detail { flex: 1; overflow-y: auto; padding: 20px 24px; }
+  #detail .placeholder { color: var(--text-dim); font-size: 13px; }
+  .kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; font-size: 13px; margin-bottom: 18px; }
+  .kv div.k { color: var(--text-dim); }
+  .kv div.v { font-family: var(--mono); word-break: break-all; }
+  #detail h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); margin: 18px 0 8px; }
+  pre {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px; font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap;
+    word-break: break-word; margin: 0;
+  }
+</style>
+</head>
+<body>
+
+  <div id="gate">
+    <h1>API Test Console</h1>
+    <p>Sign in with a Google account that's been granted access to view and send test requests.</p>
+    <button class="btn" id="signInBtn">Sign in with Google</button>
+    <p id="gateMsg" style="color: var(--err); font-size: 13px;"></p>
+  </div>
+
+  <div id="app">
+    <div id="topbar">
+      <div class="brand"><span class="dot"></span> API Test Console</div>
+      <div class="user">
+        <span id="userEmail"></span>
+        <button class="btn secondary small" id="signOutBtn">Sign out</button>
+      </div>
+    </div>
+    <div id="main">
+      <div id="composer">
+        <h2>Send Test Request</h2>
+        <div class="field">
+          <label>Endpoint URL</label>
+          <input id="endpoint" value="https://testapi.revanth-abbati.workers.dev/orders/api/add_order" />
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>api_key</label>
+            <input id="apiKey" value="test123" />
+          </div>
+          <div class="field">
+            <label>code</label>
+            <input id="code" value="revanthdt" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Content-Type</label>
+          <select id="contentType">
+            <option value="application/xml" selected>application/xml</option>
+            <option value="application/json">application/json</option>
+            <option value="text/plain">text/plain</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Body</label>
+          <textarea id="body"></textarea>
+        </div>
+        <button class="btn" id="sendBtn" style="width:100%">Send</button>
+        <div id="sendResult"></div>
+      </div>
+
+      <div id="listPane">
+        <div id="listHeader">
+          <h2>Received Requests</h2>
+          <span id="count">0</span>
+        </div>
+        <div id="list"><div class="empty">Waiting for requests…</div></div>
+      </div>
+
+      <div id="detail"><div class="placeholder">Select a request on the left to see full details.</div></div>
+    </div>
+  </div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getFirestore, collection, query, orderBy, limit, onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDD00gt9T4VeP135eRMHmnpaBWjErN0pgQ",
+  authDomain: "testapi-37ad0.firebaseapp.com",
+  projectId: "testapi-37ad0",
+  storageBucket: "testapi-37ad0.firebasestorage.app",
+  messagingSenderId: "624116528967",
+  appId: "1:624116528967:web:afaa76c22375d6008d3e62"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const gate = document.getElementById('gate');
+const gateMsg = document.getElementById('gateMsg');
+const appEl = document.getElementById('app');
+const userEmailEl = document.getElementById('userEmail');
+
+document.getElementById('signInBtn').onclick = () => {
+  gateMsg.textContent = '';
+  signInWithPopup(auth, new GoogleAuthProvider()).catch(e => {
+    gateMsg.textContent = e.message;
+  });
+};
+document.getElementById('signOutBtn').onclick = () => signOut(auth);
+
+let unsubscribe = null;
+const items = new Map();
+
+onAuthStateChanged(auth, (user) => {
+  if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+  items.clear();
+  renderList();
+
+  if (!user) {
+    gate.style.display = 'flex';
+    appEl.style.display = 'none';
+    return;
+  }
+
+  userEmailEl.textContent = user.email;
+
+  const q = query(collection(db, 'requests'), orderBy('time', 'desc'), limit(100));
+  unsubscribe = onSnapshot(q,
+    (snap) => {
+      gate.style.display = 'none';
+      appEl.style.display = 'flex';
+      items.clear();
+      snap.forEach(doc => items.set(doc.id, doc.data()));
+      renderList();
+    },
+    (err) => {
+      gate.style.display = 'flex';
+      appEl.style.display = 'none';
+      gateMsg.textContent = `Signed in as ${user.email}, but access was denied. Ask an admin to add this email to the "admins" collection in Firestore.`;
+    }
+  );
+});
+
+const listEl = document.getElementById('list');
+const countEl = document.getElementById('count');
+const detailEl = document.getElementById('detail');
+let activeId = null;
+
+function renderList() {
+  countEl.textContent = items.size;
+  if (items.size === 0) {
+    listEl.innerHTML = '<div class="empty">Waiting for requests…</div>';
+    return;
+  }
+  listEl.innerHTML = '';
+  for (const [id, data] of items) {
+    const el = document.createElement('div');
+    el.className = 'item' + (id === activeId ? ' active' : '');
+    el.innerHTML = `
+      <div class="top"><span>${formatTime(data.time)}</span></div>
+      <div><span class="method">${data.method || ''}</span> <span class="path">${data.path || ''}</span></div>
+    `;
+    el.onclick = () => { activeId = id; renderList(); renderDetail(id, data); };
+    listEl.appendChild(el);
+  }
+}
+
+function renderDetail(id, data) {
+  let headers = {};
+  try { headers = JSON.parse(data.headers || '{}'); } catch (e) {}
+
+  const headerRows = Object.entries(headers)
+    .map(([k, v]) => `<div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(v)}</div>`)
+    .join('');
+
+  detailEl.innerHTML = `
+    <div class="kv">
+      <div class="k">Time</div><div class="v">${formatTime(data.time)}</div>
+      <div class="k">Method</div><div class="v">${escapeHtml(data.method || '')}</div>
+      <div class="k">Path</div><div class="v">${escapeHtml(data.path || '')}</div>
+      <div class="k">Query</div><div class="v">${escapeHtml(data.query || '(none)')}</div>
+    </div>
+    <h3>Headers</h3>
+    <div class="kv">${headerRows}</div>
+    <h3>Body</h3>
+    <pre>${escapeHtml(prettyIfXml(data.body || ''))}</pre>
+  `;
+}
+
+function formatTime(t) {
+  if (!t) return '';
+  try { return new Date(t).toLocaleString(); } catch (e) { return t; }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+function prettyIfXml(str) {
+  if (!str.trim().startsWith('<')) return str;
+  let formatted = '';
+  let indent = '';
+  str.split(/>\s*</).forEach(node => {
+    if (node.match(/^\/\w/)) indent = indent.substring(2);
+    formatted += indent + '<' + node + '>\n';
+    if (node.match(/^<?\w[^>]*[^/]$/) && !node.startsWith('?')) indent += '  ';
+  });
+  return formatted.substring(1, formatted.length - 2);
+}
+
+// ---- Send Test Request ----
+document.getElementById('body').value = document.getElementById('body').value || '';
+fetch('sample_order.xml').then(r => r.ok ? r.text() : '').then(t => {
+  if (t && !document.getElementById('body').value) document.getElementById('body').value = t;
+}).catch(() => {});
+
+document.getElementById('sendBtn').onclick = async () => {
+  const endpoint = document.getElementById('endpoint').value.trim();
+  const apiKey = document.getElementById('apiKey').value;
+  const code = document.getElementById('code').value;
+  const contentType = document.getElementById('contentType').value;
+  const body = document.getElementById('body').value;
+  const resultEl = document.getElementById('sendResult');
+  resultEl.className = '';
+  resultEl.textContent = 'Sending…';
+  resultEl.style.display = 'block';
+
+  try {
+    const url = new URL(endpoint);
+    url.searchParams.set('api_key', apiKey);
+    url.searchParams.set('code', code);
+    const resp = await fetch(url.toString(), {
+      method: 'POST',
+      headers: { 'Content-Type': contentType },
+      body,
+    });
+    const text = await resp.text();
+    resultEl.className = resp.ok ? 'ok' : 'err';
+    resultEl.textContent = `HTTP ${resp.status} — ${text}`;
+  } catch (e) {
+    resultEl.className = 'err';
+    resultEl.textContent = 'Failed: ' + e.message;
+  }
+};
+</script>
+</body>
+</html>
